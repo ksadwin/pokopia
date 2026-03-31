@@ -205,7 +205,7 @@ def find_balanced_location(skill):
              GROUP BY p.location
              ORDER BY count;
             ''', (skill,))
-        print("Your %s skill might be needed in: " % skill)
+        print("This Pokemon's %s skill might be needed in: " % skill)
         for row in load_bearing_query:
             print("\t".join(str(c) for c in row[:]))
 
@@ -216,6 +216,20 @@ def get_existing(table):
     existing_items = [x[0] for x in cursor.execute("SELECT DISTINCT name FROM %s;" % table).fetchall()]
     db.close()
     return existing_items
+
+
+def lookup_roomies():
+    global root, name_var
+
+    pkmn = Pokemon({"name": name_var})
+    if not pkmn.exists():
+        pokemon_window()
+    else:
+        # lookup skills for pkmn
+        # find_balanced_location(skill) for each skill
+        find_best_matches(pkmn.name)
+        root.destroy()
+        choose_a_window()
 
 
 def route_input(*args):
@@ -262,17 +276,19 @@ def route_input(*args):
                     print("Autosuggesting a new Pokemon...")
                     pokemon_window(auto_name=tmp_pkmn.name, auto_houseid=houseid, auto_location=location_var.get())
     except NameError:
-        print("some lazy code just executed")
+        pass
 
-    pokemon_window()
+    root.destroy()
+    choose_a_window()
 
 
 def house_info_window():
     global root, type_var, size_var, floor_var, roomies_var_list, ditto_var
     
-    print("A house, you say?")
+    # print("A house, you say?")
     root.destroy()
     root = tk.Tk()
+    root.title("A house, you say?")
     type_var = tk.StringVar()
     size_var = tk.StringVar()
     floor_var = tk.StringVar()
@@ -311,7 +327,8 @@ def pokemon_window(auto_name='', auto_location='', auto_houseid=0):
     except NameError:
         print("Welcome to the Pokopia Habitat Harmonizer! Output shows up here.")
     except tk.TclError:
-        print("Enter another Pokemon (code did something weird edition)")
+        # print("Enter another Pokemon (code did something weird edition)")
+        pass
     root = tk.Tk()
     root.title("Pokopia Habitat Harmonizer")
     
@@ -387,7 +404,55 @@ def pokemon_window(auto_name='', auto_location='', auto_houseid=0):
 
     # Run
     root.mainloop()
+
+
+def too_bad():
+    global root
+
+    print("well too bad because i ain't coded that yet")
+    root.destroy()
+
+
+def comfort_levels_window():
+    global root
+
+    too_bad()
+
+
+def rehome_window():
+    global root, name_var
+
+    # too_bad()
+
+    try:
+        root.destroy()
+    except tk.TclError:
+        pass
+
+    root = tk.Tk()
+    root.title("Which Pokemon do you want to rehome?")
+
+    name_var = tk.StringVar()
+
+    tk.Label(root, text="Name").grid(row=0, column=0, sticky="w")
+    tk.Entry(root, textvariable=name_var).grid(row=0, column=1, sticky="ew")
+
+    tk.Button(root, text="Look for roommates", command=too_bad).grid(row=1, column=1, sticky="ew")
     
+
+def choose_a_window():
+    global root
+
+    root = tk.Tk()
+    root.title("Pokopia Habitat Harmonizer")
+    tk.Label(root, text="What do you want to do?").grid(row=0, column=0, sticky="w")
+
+    tk.Button(root, text="Add new Pokemon", command=pokemon_window).grid(row=1, column=0, sticky="ew")
+    tk.Button(root, text="Rehome a Pokemon", command=rehome_window).grid(row=1, column=1, sticky="ew")
+    tk.Button(root, text="Set comfort levels", command=comfort_levels_window).grid(row=1, column=2, sticky="ew")
+
+    root.mainloop()
+
 
 if __name__=="__main__":
     if False:
@@ -398,5 +463,5 @@ if __name__=="__main__":
         print("Wrote to database")
         db.close()
         print("got rid of them")
-    pokemon_window()
+    choose_a_window()
     
