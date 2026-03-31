@@ -86,6 +86,8 @@ class Pokemon:
         self.update_existing_pokemon()
         
     def insert_new_pokemon(self):
+        if self.houseid == 0:
+            self.houseid = None
         db = sqlite3.connect(DB_NAME)
         cursor = db.cursor()
         cursor.execute("INSERT OR IGNORE INTO pokemon (name, habitat, location, flavor, discovered, satisfaction, houseid) VALUES (:name, :habitat, :location, :flavor, :discovered, :satisfaction, :houseid);", self.__dict__)
@@ -94,6 +96,8 @@ class Pokemon:
         db.close()
 
     def update_existing_pokemon(self):
+        if self.houseid == 0:
+            self.houseid = None
         db = sqlite3.connect(DB_NAME)
         cursor = db.cursor()
         cursor.execute("UPDATE pokemon SET habitat=:habitat, location=:location, flavor=:flavor, discovered=:discovered, satisfaction=:satisfaction, houseid=:houseid WHERE name=:name;", self.__dict__)
@@ -155,7 +159,7 @@ def insert_new_house(desc, maxoccupancy):
 
 
 def get_house_info():
-    global root, type_var, size_var, location_var, houseid
+    global root, type_var, size_var, floor_var, location_var, houseid
 
     get_house_if_exists()
 
@@ -163,12 +167,17 @@ def get_house_info():
         int_occupancy = 1
         str_type = type_var.get()
         str_size = size_var.get()
-        if str_type in ["Pink", "Orange", "Gray", "Yellow", "Minecraft"] or (str_size in ["House", "Office"] and str_type != "Poke Ball"):
+        if floor_var.get():
+            int_occupancy = 2
+        elif str_type in ["Pink", "Orange", "Gray", "Yellow", "Minecraft"] or (str_size in ["House", "Office"] and str_type != "Poke Ball"):
             int_occupancy = 4
         elif str_size == "Cottage":
             int_occupancy = 2
 
-        insert_new_house(str_type + " " + str_size, int_occupancy)
+        desc = str_type + " " + str_size
+        if floor_var.get():
+            desc += " " + floor_var.get()
+        insert_new_house(desc, int_occupancy)
 
     root.destroy()
 
@@ -259,23 +268,26 @@ def route_input(*args):
 
 
 def house_info_window():
-    global root, type_var, size_var, roomies_var_list, ditto_var
+    global root, type_var, size_var, floor_var, roomies_var_list, ditto_var
     
     print("A house, you say?")
     root.destroy()
     root = tk.Tk()
     type_var = tk.StringVar()
     size_var = tk.StringVar()
+    floor_var = tk.StringVar()
     ditto_var = tk.BooleanVar(value=False)
     roomies_var_list = [tk.StringVar(),tk.StringVar(),tk.StringVar()]
 
     type_options = ["Leaf", "Sand", "Stone", "City", "Pink", "Orange", "Gray", "Yellow", "Poke Ball", "Minecraft"]
     size_options = ["Den", "Hut", "Cottage", "House", "Office"]
+    floor_options = ["Floor 1", "Floor 2"]
 
     # Row 1
     tk.Label(root, text="House info").grid(row=0, column=0, sticky="w")
     ttk.Combobox(root, textvariable=type_var, values=type_options, state="readonly").grid(row=0, column=1, sticky="ew")
     ttk.Combobox(root, textvariable=size_var, values=size_options, state="readonly").grid(row=0, column=2, sticky="ew")
+    ttk.Combobox(root, textvariable=floor_var, values=floor_options, state="readonly").grid(row=0, column=3, sticky="ew")
 
     # Row 2
     tk.Label(root, text="Roomies (?)").grid(row=1, column=0, sticky="w")
@@ -317,7 +329,7 @@ def pokemon_window(auto_name='', auto_location='', auto_houseid=0):
 
     # Dropdown contents
     location_options     = ["Fuchsia", "Vermillion", "Pewter", "Saffron", "Palette"]
-    habitat_options      = ["Humid", "Dry", "Warm", "Cold", "Bright", "Dark"]
+    habitat_options      = ["Humid", "Dry", "Warm", "Cool", "Bright", "Dark"]
     flavor_options       = ["Sweet", "Sour", "Bitter", "Dry", "Spicy"]
     satisfaction_options = ["Iffy", "Average", "Nice", "Great", "Awesome"]
 
