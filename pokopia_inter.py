@@ -204,10 +204,11 @@ def find_balanced_location(skill):
                AND p.location != ''
              GROUP BY p.location
              ORDER BY count;
-            ''', (skill,))
-        print("This Pokemon's %s skill might be needed in: " % skill)
-        for row in load_bearing_query:
-            print("\t".join(str(c) for c in row[:]))
+            ''', (skill,)).fetchall()
+        if len(load_bearing_query) > 1:
+            print("The %s skill might be needed in:" % skill)
+            for row in load_bearing_query:
+                print("\t".join(str(c) for c in row[:]))
 
 
 def get_existing(table):
@@ -218,18 +219,37 @@ def get_existing(table):
     return existing_items
 
 
-def lookup_roomies():
+def rehome_by_name():
     global root, name_var
 
-    pkmn = Pokemon({"name": name_var})
+    pkmn = Pokemon({"name": name_var.get()})
     if not pkmn.exists():
         pokemon_window()
     else:
-        # lookup skills for pkmn
-        # find_balanced_location(skill) for each skill
+        db = sqlite3.connect(DB_NAME)
+        cursor = db.cursor()
+        rs = cursor.execute("SELECT name FROM skill WHERE pokemon = ? ;", (pkmn.name,)).fetchall()
+        db.close()
+        for row in rs: 
+            find_balanced_location(row[0])
         find_best_matches(pkmn.name)
         root.destroy()
         choose_a_window()
+
+
+def skill_lookup_wrapper():
+    global root, skill_var
+
+    skill_s = skill_var.get()
+    if skill_s:
+        for skill in skill_s.split(","):
+            find_balanced_location(skill)
+    else:
+        for skill in get_existing("skill"):
+            find_balanced_location(skill)
+
+    root.destroy()
+    choose_a_window()
 
 
 def route_input(*args):
@@ -422,8 +442,6 @@ def comfort_levels_window():
 def rehome_window():
     global root, name_var
 
-    # too_bad()
-
     try:
         root.destroy()
     except tk.TclError:
@@ -437,8 +455,31 @@ def rehome_window():
     tk.Label(root, text="Name").grid(row=0, column=0, sticky="w")
     tk.Entry(root, textvariable=name_var).grid(row=0, column=1, sticky="ew")
 
-    tk.Button(root, text="Look for roommates", command=too_bad).grid(row=1, column=1, sticky="ew")
-    
+    tk.Button(root, text="Look for roommates", command=rehome_by_name).grid(row=1, column=1, sticky="ew")
+
+    root.mainloop()
+
+
+def skill_window():
+    global root, skill_var
+
+    try:
+        root.destroy()
+    except tk.TclError:
+        pass
+
+    root = tk.Tk()
+    root.title("Check skill occurrence across locations")
+
+    skill_var = tk.StringVar()
+    tk.Label(root, text="Skill").grid(row=0, column=0, sticky="w")
+    tk.Entry(root, textvariable=skill_var).grid(row=0, column=1, sticky="ew")
+
+    tk.Label(root, text="(Leave blank to check all levels)").grid(row=1,column=1, sticky="w")
+    tk.Button(root, text="Submit", command=skill_lookup_wrapper).grid(row=2, column=1, sticky="ew")
+
+    root.mainloop()
+
 
 def choose_a_window():
     global root
@@ -450,6 +491,7 @@ def choose_a_window():
     tk.Button(root, text="Add new Pokemon", command=pokemon_window).grid(row=1, column=0, sticky="ew")
     tk.Button(root, text="Rehome a Pokemon", command=rehome_window).grid(row=1, column=1, sticky="ew")
     tk.Button(root, text="Set comfort levels", command=comfort_levels_window).grid(row=1, column=2, sticky="ew")
+    tk.Button(root, text="Check skill spread", command=skill_window).grid(row=1,column=3, sticky="ew")
 
     root.mainloop()
 
