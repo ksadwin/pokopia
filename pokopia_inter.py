@@ -77,7 +77,7 @@ class Pokemon:
     def fill_in_blanks_from_db(self, rs):
         # rs is a sqlite3.Row returned by fetchone
         for columnname in rs.keys():
-            if columnname in self.__dict__ and not self.__dict__[columnname]:
+            if columnname not in self.__dict__ or not self.__dict__[columnname]:
                 self.__dict__[columnname] = rs[columnname]
 
     def write_to_db(self):
@@ -106,12 +106,49 @@ class Pokemon:
         db.close()
 
 
+def update_comfort_levels(comfort_level, str_namelist):
+    global location_var
+
+    new_pkmn = []
+
+    for name in str_namelist.split(","):
+        pkmn = Pokemon({"name": name.strip(), "location": location_var.get(), "satisfaction": comfort_level})
+        if pkmn.exists():
+            pkmn.write_to_db()
+        else:
+            new_pkmn.append(pkmn)
+
+    return new_pkmn
+
+
+def set_comfort_levels():
+    global root, location_var, awesome_var, great_var, nice_var, average_var, iffy_var
+
+    root.destroy()
+
+    new_pkmn = []
+
+    if awesome_var.get():
+        new_pkmn.extend(update_comfort_levels("Awesome", awesome_var.get()))
+    if great_var.get():
+        new_pkmn.extend(update_comfort_levels("Great", great_var.get()))
+    if nice_var.get():
+        new_pkmn.extend(update_comfort_levels("Nice", nice_var.get()))
+    if average_var.get():
+        new_pkmn.extend(update_comfort_levels("Average", average_var.get()))
+    if iffy_var.get():
+        new_pkmn.extend(update_comfort_levels("Iffy", iffy_var.get()))
+
+    for p in new_pkmn:
+        pokemon_window(auto_name=p.name, auto_location=p.location, auto_satisfaction=p.satisfaction)
+
+
 def find_best_matches(name):
     db = sqlite3.connect(DB_NAME)
     db.row_factory = sqlite3.Row
     cursor = db.cursor()
     meaty_query = cursor.execute('''
-        SELECT COUNT(*) as 'rating', p.name, p.location, p.satisfaction
+        SELECT p.name, p.location, p.satisfaction, COUNT(*) as 'rating', GROUP_CONCAT(pl.name, ', ')
 --          , h.type, h.id, (SELECT COUNT(*) FROM pokemon WHERE houseid = h.id) AS currct, h.maxcount
           FROM likes pl
          INNER JOIN pokemon p ON pl.pokemon = p.name
@@ -123,7 +160,7 @@ def find_best_matches(name):
         ''', (name, name, name))  # is there a better way to add these arguments...
     print("Your most compatible roommates:")
     for row in meaty_query.fetchall():
-        print("\t".join(str(c) for c in row[:]))
+        print("%-12s %-12s %-12s" % (row[:3]) + "\t".join(str(c) for c in row[3:]))
     db.close()
 
 
@@ -161,6 +198,8 @@ def insert_new_house(desc, maxoccupancy):
 def get_house_info():
     global root, type_var, size_var, floor_var, location_var, houseid
 
+    root.destroy()
+
     get_house_if_exists()
 
     if not houseid:
@@ -178,8 +217,6 @@ def get_house_info():
         if floor_var.get():
             desc += " " + floor_var.get()
         insert_new_house(desc, int_occupancy)
-
-    root.destroy()
 
 
 def add_attr(table, name, value):
@@ -222,9 +259,11 @@ def get_existing(table):
 def rehome_by_name():
     global root, name_var
 
+    root.destroy()
+
     pkmn = Pokemon({"name": name_var.get()})
     if not pkmn.exists():
-        pokemon_window()
+        pokemon_window(auto_name=name_var.get())
     else:
         db = sqlite3.connect(DB_NAME)
         cursor = db.cursor()
@@ -233,12 +272,12 @@ def rehome_by_name():
         for row in rs: 
             find_balanced_location(row[0])
         find_best_matches(pkmn.name)
-        root.destroy()
-        choose_a_window()
 
 
 def skill_lookup_wrapper():
     global root, skill_var
+
+    root.destroy()
 
     skill_s = skill_var.get()
     if skill_s:
@@ -248,12 +287,11 @@ def skill_lookup_wrapper():
         for skill in get_existing("skill"):
             find_balanced_location(skill)
 
-    root.destroy()
-    choose_a_window()
-
 
 def route_input(*args):
     global root, name_var, location_var, habitat_var, skills_var_list, likes_var_list, flavor_var, satisfaction_var, house_var, houseid, roomies_var_list
+
+    root.destroy()
 
     pkmndict = {
         "name": name_var.get(),
@@ -298,15 +336,23 @@ def route_input(*args):
     except NameError:
         pass
 
+
+def too_bad():
+    global root
+
+    print("well too bad because i ain't coded that yet")
+
     root.destroy()
-    choose_a_window()
 
 
 def house_info_window():
     global root, type_var, size_var, floor_var, roomies_var_list, ditto_var
     
-    # print("A house, you say?")
-    root.destroy()
+    try:
+        root.destroy()
+    except tk.TclError:
+        pass
+
     root = tk.Tk()
     root.title("A house, you say?")
     type_var = tk.StringVar()
@@ -338,16 +384,12 @@ def house_info_window():
     root.mainloop()
 
 
-def pokemon_window(auto_name='', auto_location='', auto_houseid=0):
+def pokemon_window(auto_name='', auto_location='', auto_houseid=0, auto_satisfaction=''):
     global root, name_var, location_var, habitat_var, skills_var_list, likes_var_list, flavor_var, satisfaction_var, house_var, houseid
 
     try:
         root.destroy()
-        print("Enter another Pokemon!")
-    except NameError:
-        print("Welcome to the Pokopia Habitat Harmonizer! Output shows up here.")
     except tk.TclError:
-        # print("Enter another Pokemon (code did something weird edition)")
         pass
     root = tk.Tk()
     root.title("Pokopia Habitat Harmonizer")
@@ -361,7 +403,7 @@ def pokemon_window(auto_name='', auto_location='', auto_houseid=0):
     skills_var_list  = [tk.StringVar(), tk.StringVar()]
     likes_var_list   = [tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar(), tk.StringVar()]
     flavor_var       = tk.StringVar()
-    satisfaction_var = tk.StringVar()
+    satisfaction_var = tk.StringVar(value=auto_satisfaction)
     house_var        = tk.BooleanVar(value=houseid!=0)
 
     # Dropdown contents
@@ -425,18 +467,52 @@ def pokemon_window(auto_name='', auto_location='', auto_houseid=0):
     # Run
     root.mainloop()
 
-
-def too_bad():
-    global root
-
-    print("well too bad because i ain't coded that yet")
-    root.destroy()
-
+#########################################################################################
 
 def comfort_levels_window():
-    global root
+    global root, location_var, awesome_var, great_var, nice_var, average_var, iffy_var
 
-    too_bad()
+    location_options = ["Fuchsia", "Vermillion", "Pewter", "Saffron", "Palette"]
+
+    try:
+        root.destroy()
+    except tk.TclError:
+        pass
+
+    root = tk.Tk()
+    root.title("Mass comfort updater")
+
+    location_var = tk.StringVar()
+    awesome_var = tk.StringVar()
+    great_var = tk.StringVar()
+    nice_var = tk.StringVar()
+    average_var = tk.StringVar()
+    iffy_var = tk.StringVar()
+
+    tk.Label(root, text="Location").grid(row=0, column=0, sticky="w")
+    ttk.Combobox(root, textvariable=location_var,
+                 values=location_options, state="readonly").grid(row=0, column=1, sticky="ew")
+
+    tk.Label(root, text="Enter comma-separated list of Pokemon names").grid(row=1, column=1, sticky="w")
+
+    tk.Label(root, text="Awesome").grid(row=2, column=0, sticky="w")
+    tk.Entry(root, textvariable=awesome_var).grid(row=2, column=1, sticky="ew")
+
+    tk.Label(root, text="Great").grid(row=3, column=0, sticky="w")
+    tk.Entry(root, textvariable=great_var).grid(row=3, column=1, sticky="ew")
+
+    tk.Label(root, text="Nice").grid(row=4, column=0, sticky="w")
+    tk.Entry(root, textvariable=nice_var).grid(row=4, column=1, sticky="ew")
+    
+    tk.Label(root, text="Average").grid(row=5, column=0, sticky="w")
+    tk.Entry(root, textvariable=average_var).grid(row=5, column=1, sticky="ew")
+
+    tk.Label(root, text="Iffy/No Home").grid(row=6, column=0, sticky="w")
+    tk.Entry(root, textvariable=iffy_var).grid(row=6, column=1, sticky="ew")
+
+    tk.Button(root, text="Submit", command=set_comfort_levels).grid(row=7, column=0, sticky="ew")
+
+    root.mainloop()
 
 
 def rehome_window():
@@ -484,26 +560,38 @@ def skill_window():
 def choose_a_window():
     global root
 
+    try:
+        root.destroy()
+    except NameError:
+        print("Welcome to the Pokopia Habitat Harmonizer! Output shows up here.")
+    except tk.TclError:
+        pass
+
     root = tk.Tk()
     root.title("Pokopia Habitat Harmonizer")
     tk.Label(root, text="What do you want to do?").grid(row=0, column=0, sticky="w")
+    tk.Button(root, text="Quit", command=exit).grid(row=0, column=3, sticky="ew")
 
     tk.Button(root, text="Add new Pokemon", command=pokemon_window).grid(row=1, column=0, sticky="ew")
     tk.Button(root, text="Rehome a Pokemon", command=rehome_window).grid(row=1, column=1, sticky="ew")
     tk.Button(root, text="Set comfort levels", command=comfort_levels_window).grid(row=1, column=2, sticky="ew")
     tk.Button(root, text="Check skill spread", command=skill_window).grid(row=1,column=3, sticky="ew")
 
+
     root.mainloop()
 
 
 if __name__=="__main__":
     if False:
+        rename = {"Polywrath": "Poliwrath", "NInetales": "Ninetales", "Toxicitry (Amped)": "Toxicitry (amped)"}
         db = sqlite3.connect(DB_NAME)
         cursor = db.cursor()
-        cursor.execute("DELETE FROM house WHERE id = 3;")
+        for k, v in rename.items():
+            cursor.execute("UPDATE pokemon SET name = ? WHERE name = ?;", (v,k))
+            print("Wrote to database")
         db.commit()
-        print("Wrote to database")
         db.close()
-        print("got rid of them")
-    choose_a_window()
+
+    while True:
+        choose_a_window()
     
